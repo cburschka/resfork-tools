@@ -48,5 +48,47 @@ class ResMap:
 
     def readData(self, resId):
         item = self[resId]
-        self.io.seek(item.start)
-        return self.io.read(item.length)
+        self.io.seek(self.iData[0] + item.start)
+        return ResourceData(item.type, self.io.read(item.length))
+
+    def extractAll(self, path):
+        assert os.path.isdir(path)
+        for item in self.map.values():
+            if (item.name):
+                filename = '{}/{}.{}.{}'.format(path, item.id, item.name, item.type.lower())
+            else:
+                filename = '{}/{}.{}'.format(path, item.id, item.type.lower())
+            open(filename, 'wb').write(self.readData(item.id).toStream())
+
+
+
+'''For reasons that probably made sense at the time, PICT files start with 512 bytes of nothing.'''
+class PictCoder:
+    def encode(data):
+        return 512 * b'\0' + data
+
+    def decode(data):
+        return data[512:]
+
+class ResourceData:
+
+    coders = {
+        'PICT': PictCoder
+    }
+
+    def __init__(self, resType, data):
+        self.type = resType.upper()
+        self.data = data
+
+    @classmethod
+    def fromStream(resType, data):
+        resType = resType.upper()
+        if resType in self.coders:
+            data = self.coders[resType].decode(data)
+        return self(resType, data)
+
+    def toStream(self):
+        data = self.data
+        if self.type in self.coders:
+            data = self.coders[self.type].encode(data)
+        return data
