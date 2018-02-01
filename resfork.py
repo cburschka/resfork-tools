@@ -107,16 +107,21 @@ class ResMap:
         resMap.write(struct.pack('>HH', 28, iNames))
 
         data = data.getvalue()
-        resMap = resMap.getvalue()
 
         output = output or io.BytesIO()
-        output.write(16*b'\0')
+        output.write(256*b'\0')
+        iData = output.tell()
         output.write(data)
         iMap = output.tell()
-        output.write(resMap)
+
+        header = struct.pack('>IIII', iData, iMap, len(data), len(resMap.getvalue()))
+        resMap.seek(0)
+        resMap.write(header)
+
+        output.write(resMap.getvalue())
 
         output.seek(0)
-        output.write(struct.pack('>IIII', 16, iMap, len(data), len(resMap)))
+        output.write(header)
 
         return output
 
