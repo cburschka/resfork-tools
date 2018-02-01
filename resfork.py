@@ -74,7 +74,7 @@ class ResMap:
                 nameData.write(name)
             else:
                 iName = -1
-            refs[item.id] = (resId, iName, item.attributes << 24 | oData)
+            refs[item.id] = (item.id, iName, item.attributes << 24 | oData)
 
             refLists[resource.item.type] = []
 
@@ -84,31 +84,39 @@ class ResMap:
 
         # Concatenate the ref lists, and create the type list.
         typeList = []
+        nTypes = len(refLists)
         refData = io.BytesIO()
+        refData.write(struct.pack('>H', nTypes-1))
+        refData.write(b'\0' * (8*nTypes))
         for resType, refList in refLists.items():
-            typeList.append((resType.encode('macintosh'), len(refList) - 1, refData.tell() + 8*len(refLists)))
+            typeList.append((resType.encode('macintosh'), len(refList) - 1, refData.tell()))
             print(refList)
             refData.write(b''.join(struct.pack('>HhIxxxx', *x) for x in refList))
 
+        # Insert the type list (which comes before the refData).
+        refData.seek(2)
+        refData.write(b''.join(struct.pack('>4sHH', *i) for i in typeList))
+
         # Concatenate the map.
-        resMap = io.BytesIO(30 * b'\0')
-        resMap.write(b''.join(struct.pack('>4sHH', *i) for i in typeList))
+        resMap = io.BytesIO()
+        resMap.write(28 * b'\0')
         resMap.write(refData.getvalue())
         iNames = resMap.tell()
         resMap.write(nameData.getvalue())
         resMap.seek(24)
-        resMap.write(struct.pack('>HHH', 28, iNames, len(typeList) - 1))
+        resMap.write(struct.pack('>HH', 28, iNames))
 
         data = data.getvalue()
         resMap = resMap.getvalue()
 
-        output = output or io.BytesIO(16 * b'\0')
+        output = output or io.BytesIO()
+        output.write(16*b'\0')
         output.write(data)
         iMap = output.tell()
         output.write(resMap)
 
         output.seek(0)
-        output.write(struct.pack('>IIII', 16, len(data), iMap, len(resMap)))
+        output.write(struct.pack('>IIII', 16, iMap, len(data), len(resMap)))
 
         return output
 
